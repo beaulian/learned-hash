@@ -16,7 +16,7 @@ int main()
 
   std::mt19937 rng;
   rng.seed(std::random_device()());
-  std::lognormal_distribution<double> dist(0.0, 3.0);
+  std::lognormal_distribution<double> dist(0.0, 2.0);
 
   std::set<int> samples;
 
