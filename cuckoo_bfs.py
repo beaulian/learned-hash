@@ -1,6 +1,7 @@
 # coding=utf-8
 
 import math
+import queue
 import random
 
 DEFAULT_BUCKET_SIZE = 4
@@ -10,6 +11,7 @@ DEFAULT_MAX_ITERS = 500
 PRIME_DIVISOR = 4294967291
 ENTRY_EMPTY = -1
 KEY_NOT_FOUND = -1
+MAX_BFS_PATH_LEN = 8
 
 
 make_entry = lambda k, v: (k << 32) + v
@@ -19,29 +21,44 @@ gen_random = lambda: random.randint(1, PRIME_DIVISOR - 1)
 alt_mod = lambda x, y: (x * y) >> 32
 
 
+class SearchSlot(object):
+    def __init__(self, index, depth):
+        self.index = index
+        self.depth = depth
+        # check depth
+        if not (-1 <= self.depth <= MAX_BFS_PATH_LEN - 1):
+            raise ValueError("depth must >= -1 and <= MAX_BFS_PATH_LEN - 1")
+
+
 class Bucket(object):
     def __init__(self):
         self.__capacity = 0
         self.__b = [ENTRY_EMPTY for _ in range(DEFAULT_BUCKET_SIZE)]
 
+    def occupied(self, slot):
+        return self.__b[slot] != ENTRY_EMPTY
+
     def insert(self, key, value):
-        if self.__capacity >= len(self.__b):
+        if self.__capacity >= DEFAULT_BUCKET_SIZE:
             return False
         self.__b[self.__capacity] = make_entry(key, value)
         self.__capacity += 1
         return True
+
+    def insert_by_slot(self, slot, key, value):
+        if self.__capacity >= DEFAULT_BUCKET_SIZE:
+            return
+        self.__b[slot] = make_entry(key, value)
+        self.__capacity += 1
+
+    def get_by_slot(self, slot):
+        return get_key(self.__b[slot]), get_value(self.__b[slot])
 
     def get(self, key):
         for e in self.__b:
             if get_key(e) == key:
                 return get_value(e)
         return KEY_NOT_FOUND
-
-    def swap(self, key, value):
-        i = random.randint(0, 3)
-        entry = make_entry(key, value)
-        entry, self.__b[i] = self.__b[i], entry
-        return get_key(entry), get_value(entry)
 
     def __len__(self):
         return self.__capacity
@@ -62,7 +79,7 @@ class Cuckoo(object):
         self.__num_buckets = int(math.ceil(capacity * times))
         self.__stash_count = 0
         self.__insert_count = 0
-        self.__conflict_count = 0
+        self.__search_depth = 0
         self.__constants_1 = [gen_random(), gen_random()]
         self.__constants_2 = [gen_random(), gen_random()]
         self.__stash_constants = [gen_random(), gen_random()]
@@ -70,10 +87,6 @@ class Cuckoo(object):
         self.__stash_size = stash_size
         self.__buckets = [Bucket() for _ in range(self.__num_buckets)]
         self.__stash = [Bucket() for _ in range(self.__stash_size)]
-        # self.__rfile = open('dataset.txt', 'w')
-
-    # def __del__(self):
-    #     self.__rfile.close()
 
     def insert(self, keys_, values_):
         print('numb_buckets: ', self.__num_buckets, 'stash_size: ', self.__stash_size)
@@ -85,41 +98,31 @@ class Cuckoo(object):
 
     def __insert(self, key, value):
         i1 = self.__hash(key, self.__constants_1)
-        b1 = self.__buckets[i1]
-        # try insert
-        if b1.insert(key, value):
-            # self.__rfile.write("%d %d\n" % (key, i1))
-            self.__insert_count += 1
-            return True
         i2 = self.__hash(key, self.__constants_2)
-        b2 = self.__buckets[i2]
-        if b2.insert(key, value):
-            # self.__rfile.write("%d %d\n" % (key, i2))
-            self.__insert_count += 1
-            return True
-        # iter
-        # print('enter iter: ', key)
-
-        i = random.choice([i1, i2])
-        b = self.__buckets[i]
-        for _ in range(self.__max_iters):
-            self.__conflict_count += 1
-            key, value = b.swap(key, value)
-            i = self.__next_index(key, i)
-            b = self.__buckets[i]
-            if b.insert(key, value):
-                # self.__rfile.write("%d %d\n" % (key, i))
-                self.__insert_count += 1
-                return True
+        # insert
+        q = queue.Queue()
+        q.put(SearchSlot(i1, 0))
+        q.put(SearchSlot(i2, 0))
+        while not q.empty():
+            x = q.get()
+            b = self.__buckets[x.index]
+            for slot in range(DEFAULT_BUCKET_SIZE):
+                if not b.occupied(slot):
+                    self.__search_depth += 1
+                    self.__insert_count += 1
+                    b.insert_by_slot(slot, key, value)
+                    return
+                if x.depth < MAX_BFS_PATH_LEN - 1:
+                    key, value = b.get_by_slot(slot)
+                    q.put(SearchSlot(self.__next_index(key, x.index), x.depth + 1))
         # stash
         # print('enter stash: ', key)
         slot = self.__stash_hash(key, self.__stash_constants)
         if self.__stash[slot].insert(key, value):
-            # self.__rfile.write("%d %d\n" % (key, slot + self.__num_buckets))
             self.__stash_count += 1
-            return True
-
-        return False
+            return
+        # failed
+        print("failed to insert: ", key)
 
     def __next_index(self, key, previous_index):
         i1, i2 = self.__hash(key, self.__constants_1), self.__hash(key, self.__constants_2)
@@ -162,8 +165,8 @@ class Cuckoo(object):
     def stash_count(self):
         return self.__stash_count
 
-    def conflict_count(self):
-        return self.__conflict_count
+    def average_search_depth(self):
+        return self.__search_depth / self.__num_buckets
 
 
 def read_keys(file):
@@ -189,7 +192,6 @@ if __name__ == "__main__":
     print("insert count: ", cuckoo.insert_count())
     print("stash count: ", cuckoo.stash_count())
     print("sum count: ", count)
-    print("conflict count: ", cuckoo.conflict_count())
 
     start = time.time()
     results = cuckoo.find(keys)
