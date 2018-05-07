@@ -10,29 +10,28 @@ import random
 import math
 from bisect import bisect_left
 
-url_to_english_words = \
-    'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt'
+
+def exponential_distribution(lambda_=1.0):
+    u = random.random()
+    x = - math.log(u) / lambda_
+    return x
 
 
-def get_english_words():
-    if not os.path.isfile('words.txt'):
-        import subprocess
-        subprocess.call(['wget', url_to_english_words])
+# with open("dataset2.txt", 'w') as f:
+#     hashes = [exponential_distribution() for _ in range(19000)]
+#     hashes = sorted(hashes)
+#     for i in range(19000):
+#         f.write("%f\n" % hashes[i])
 
-    with open('words.txt') as f:
-        english_words = []
+
+def read_keys(file):
+    with open(file, "r") as f:
         for line in f:
-            english_words.append(line.strip())
-
-    return english_words
+            yield float(line.strip())
 
 
-def sorted_hash_map(N=1000):
-    # ignore the map for now, just get random hashes
-    english_words = get_english_words()
-    english_words = english_words[:N]
-    hashes = [abs(hash(word)) >> 32 for word in english_words]
-    hashes = sorted(hashes)  # pseudo hash map
+def sorted_hash_map(N=19000):
+    hashes = list(read_keys("dataset2.txt"))
     def random_fun():
         index = random.randint(0, N - 1)
         hash_ = hashes[index]
@@ -40,7 +39,7 @@ def sorted_hash_map(N=1000):
     return hashes, random_fun
 
 
-def get_model(dim=32):
+def get_model(dim=128):
     model = torch.nn.Sequential(
           torch.nn.Linear(1, dim),
           torch.nn.ReLU(),
@@ -60,15 +59,8 @@ def naive_index_search(x, numbers):
     return idx - 1
 
 
-def bisect_search(x, numbers):
-    i = bisect_left(numbers, x)
-    if i:
-        return i - 1
-    raise ValueError
-
-
 @click.command()
-@click.option('--n', default=10000, type=int,
+@click.option('--n', default=19000, type=int,
     help='Size of sorted array.')
 @click.option('--lr', default=9e-3, type=float,
     help='Learning rate of DL model (only parameter that matters!)')
@@ -88,7 +80,6 @@ def main(n, lr):
             batch_y = []
             for _ in range(32):
                 x, y = random_fun()
-                print(x, y)
                 batch_x.append(x)
                 batch_y.append(y)
 
@@ -112,10 +103,10 @@ def main(n, lr):
     def _test(x):
         pred = model(_featurize([x])) * N
         # idx = naive_index_search(x, numbers)
-        idx = bisect_search(x, numbers)
+        idx = bisect_left(numbers, x)
         print('Real:', idx, 'Predicted:', float(pred.data[0]))
 
-    _test(984666871)
+    _test(1.5)
 
 
 if __name__ == '__main__':

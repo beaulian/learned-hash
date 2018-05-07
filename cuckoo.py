@@ -175,10 +175,10 @@ def read_keys(file):
 if __name__ == "__main__":
     import time
 
-    N = 19000
+    N = 190000
     keys = list(read_keys("lognormal.sorted.%d.txt" % N))
     values = [i for i in range(N)]
-    cuckoo = Cuckoo(capacity=N, times=0.3)
+    cuckoo = Cuckoo(capacity=N, times=2)
 
     start = time.time()
     count = cuckoo.insert(keys, values)
