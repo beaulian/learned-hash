@@ -6,7 +6,7 @@ import random
 DEFAULT_BUCKET_SIZE = 4
 DEFAULT_STASH_SIZE = 101
 DEFAULT_TIMES = 2.01
-DEFAULT_MAX_ITERS = 500
+DEFAULT_MAX_ITERS = 190000
 PRIME_DIVISOR = 4294967291
 ENTRY_EMPTY = -1
 KEY_NOT_FOUND = -1
@@ -70,6 +70,7 @@ class Cuckoo(object):
         self.__stash_size = stash_size
         self.__buckets = [Bucket() for _ in range(self.__num_buckets)]
         self.__stash = [Bucket() for _ in range(self.__stash_size)]
+        self.search_count = []
         # self.__rfile = open('dataset.txt', 'w')
 
     # def __del__(self):
@@ -84,18 +85,21 @@ class Cuckoo(object):
         return self.__insert_count + self.__stash_count
 
     def __insert(self, key, value):
+        count = 1
         i1 = self.__hash(key, self.__constants_1)
         b1 = self.__buckets[i1]
         # try insert
         if b1.insert(key, value):
             # self.__rfile.write("%d %d\n" % (key, i1))
             self.__insert_count += 1
+            self.search_count.append(count)
             return True
         i2 = self.__hash(key, self.__constants_2)
         b2 = self.__buckets[i2]
         if b2.insert(key, value):
             # self.__rfile.write("%d %d\n" % (key, i2))
             self.__insert_count += 1
+            self.search_count.append(count)
             return True
         # iter
         # print('enter iter: ', key)
@@ -103,12 +107,14 @@ class Cuckoo(object):
         i = random.choice([i1, i2])
         b = self.__buckets[i]
         for _ in range(self.__max_iters):
+            count += 1
             self.__conflict_count += 1
             key, value = b.swap(key, value)
             i = self.__next_index(key, i)
             b = self.__buckets[i]
             if b.insert(key, value):
                 # self.__rfile.write("%d %d\n" % (key, i))
+                self.search_count.append(count)
                 self.__insert_count += 1
                 return True
         # stash
@@ -175,11 +181,10 @@ def read_keys(file):
 if __name__ == "__main__":
     import time
 
-    N = 190000
+    N = 19000
     keys = list(read_keys("lognormal.sorted.%d.txt" % N))
     values = [i for i in range(N)]
-    cuckoo = Cuckoo(capacity=N, times=2)
-
+    cuckoo = Cuckoo(capacity=N/DEFAULT_BUCKET_SIZE, times=1)
     start = time.time()
     count = cuckoo.insert(keys, values)
     end = time.time()
@@ -189,7 +194,8 @@ if __name__ == "__main__":
     print("insert count: ", cuckoo.insert_count())
     print("stash count: ", cuckoo.stash_count())
     print("sum count: ", count)
-    print("conflict count: ", cuckoo.conflict_count())
+    # print("conflict count: ", cuckoo.conflict_count())
+    print("search count: ",cuckoo.search_count)
 
     start = time.time()
     results = cuckoo.find(keys)

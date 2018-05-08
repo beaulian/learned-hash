@@ -12,7 +12,7 @@ int main()
 {
   double scale = 1e+6;
   double max = double(INT_MAX) / scale;
-  int nelements = 190;
+  int nelements = 19000;
 
   std::mt19937 rng;
   rng.seed(std::random_device()());
@@ -29,7 +29,7 @@ int main()
   std::vector<int> vec(samples.begin(), samples.end());
   std::sort(vec.begin(), vec.end());
 
-  FILE *fout = fopen("lognormal.sorted.190.txt", "w");
+  FILE *fout = fopen("lognormal.sorted.19000.txt", "w");
   for (int x : vec) {
     fprintf(fout, "%d\n", x);
   }
