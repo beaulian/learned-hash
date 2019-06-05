@@ -2,6 +2,7 @@
 
 import math
 import random
+from collections import Counter
 
 DEFAULT_BUCKET_SIZE = 4
 DEFAULT_STASH_SIZE = 101
@@ -69,7 +70,7 @@ class Cuckoo(object):
         self.__max_iters = max_iters
         self.__stash_size = stash_size
         self.__buckets = [Bucket() for _ in range(self.__num_buckets)]
-        self.__stash = [Bucket() for _ in range(self.__stash_size)]
+        # self.__stash = [Bucket() for _ in range(self.__stash_size)]
         self.search_count = []
         # self.__rfile = open('dataset.txt', 'w')
 
@@ -119,11 +120,11 @@ class Cuckoo(object):
                 return True
         # stash
         # print('enter stash: ', key)
-        slot = self.__stash_hash(key, self.__stash_constants)
-        if self.__stash[slot].insert(key, value):
+        # slot = self.__stash_hash(key, self.__stash_constants)
+        # if self.__stash[slot].insert(key, value):
             # self.__rfile.write("%d %d\n" % (key, slot + self.__num_buckets))
-            self.__stash_count += 1
-            return True
+        #    self.__stash_count += 1
+        #    return True
 
         return False
 
@@ -146,17 +147,17 @@ class Cuckoo(object):
         if v2 != KEY_NOT_FOUND:
             return v2
         # stash
-        slot = self.__stash_hash(key, self.__stash_constants)
-        v3 = self.__stash[slot].get(key)
-        if v3 != KEY_NOT_FOUND:
-            return v3
+        # slot = self.__stash_hash(key, self.__stash_constants)
+        # v3 = self.__stash[slot].get(key)
+        # if v3 != KEY_NOT_FOUND:
+        #    return v3
         return KEY_NOT_FOUND
 
     def __hash(self, k, constants_):
         return (constants_[0] ^ k + constants_[1]) % self.__num_buckets
 
-    def __stash_hash(self, k, stash_constants_):
-        return (stash_constants_[0] ^ k + stash_constants_[1]) % self.__stash_size
+    # def __stash_hash(self, k, stash_constants_):
+    #     return (stash_constants_[0] ^ k + stash_constants_[1]) % self.__stash_size
 
     def load_factor(self):
         return (self.__insert_count + self.__stash_count) / \
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     N = 19000
     keys = list(read_keys("lognormal.sorted.%d.txt" % N))
     values = [i for i in range(N)]
-    cuckoo = Cuckoo(capacity=N/DEFAULT_BUCKET_SIZE, times=1)
+    cuckoo = Cuckoo(capacity=N/DEFAULT_BUCKET_SIZE, times=1.05)
     start = time.time()
     count = cuckoo.insert(keys, values)
     end = time.time()
@@ -195,7 +196,7 @@ if __name__ == "__main__":
     print("stash count: ", cuckoo.stash_count())
     print("sum count: ", count)
     # print("conflict count: ", cuckoo.conflict_count())
-    print("search count: ",cuckoo.search_count)
+    print("search count: ", Counter(cuckoo.search_count))
 
     start = time.time()
     results = cuckoo.find(keys)
